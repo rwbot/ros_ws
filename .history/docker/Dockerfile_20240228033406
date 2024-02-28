@@ -1,10 +1,10 @@
 # ROS distribution to use
-ARG ROS_DISTRO=noetic
-ARG BASE_WS=ros_ws
+ARG ROS_DISTRO=humble
+
 ########################################
 # Base Image for TurtleBot3 Simulation #
 ########################################
-FROM osrf/ros:${ROS_DISTRO}-robot as base
+FROM osrf/ros:${ROS_DISTRO}-desktop as base
 ENV ROS_DISTRO=${ROS_DISTRO}
 SHELL ["/bin/bash", "-c"]
 
@@ -14,22 +14,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  python3-pip python3-opencv python3-tk python3-pyqt5.qtwebengine
 
 # Install additional Python modules
-RUN pip3 install pyudev pyserial pyusb matplotlib transforms3d
+RUN pip3 install matplotlib transforms3d
+
+# Use Cyclone DDS as middleware
+RUN apt-get update && apt-get install -y --no-install-recommends \
+ ros-${ROS_DISTRO}-rmw-cyclonedds-cpp
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
 # Create Colcon workspace with external dependencies
-RUN mkdir -p /${BASE_WS}/src
-WORKDIR /${BASE_WS}/src
+RUN mkdir -p /turtlebot3_ws/src
+WORKDIR /turtlebot3_ws/src
 COPY dependencies.repos .
 RUN vcs import < dependencies.repos
 
 # Build the base Colcon workspace, installing dependencies first.
-WORKDIR /${BASE_WS}
+WORKDIR /turtlebot3_ws
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash \
  && apt-get update -y \
  && rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y \
- && catkin build --symlink-install
+ && colcon build --symlink-install
+ENV TURTLEBOT3_MODEL=waffle_pi
 
-# # Download Groot2 AppImage and place it in the home folder.
+# Download Groot2 AppImage and place it in the home folder.
 WORKDIR /root/
 RUN curl -o Groot2.AppImage https://s3.us-west-1.amazonaws.com/download.behaviortree.dev/groot2_linux_installer/Groot2-v1.0.1-x86_64.AppImage \
  && chmod a+x Groot2.AppImage
@@ -41,23 +47,23 @@ RUN chmod -R 0700 /tmp/runtime-root
 ENV NO_AT_BRIDGE 1
 
 # Set up the entrypoint
-WORKDIR /${BASE_WS}
+WORKDIR /turtlebot3_ws
 COPY ./docker/entrypoint.sh /
 ENTRYPOINT [ "/entrypoint.sh" ]
 
 ###########################################
-# Overlay Image for External Source Code
+# Overlay Image for TurtleBot3 Simulation #
 ###########################################
 FROM base AS overlay
-ARG OVERLAY_WS=overlay_ws
+
 # Create an overlay Colcon workspace
-RUN mkdir -p /${OVERLAY_WS}/src
-WORKDIR /${OVERLAY_WS}
-# COPY ./tb3_autonomy/ ./src/tb3_autonomy/
-# COPY ./tb3_worlds/ ./src/tb3_worlds/
-RUN source /${BASE_WS}/install/setup.bash \
+RUN mkdir -p /overlay_ws/src
+WORKDIR /overlay_ws
+COPY ./tb3_autonomy/ ./src/tb3_autonomy/
+COPY ./tb3_worlds/ ./src/tb3_worlds/
+RUN source /turtlebot3_ws/install/setup.bash \
  && rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y \
- && catkin build --symlink-install
+ && colcon build --symlink-install
 
 # Set up the entrypoint
 COPY ./docker/entrypoint.sh /
@@ -67,10 +73,9 @@ ENTRYPOINT [ "/entrypoint.sh" ]
 # Development Image #
 #####################
 FROM overlay as dev
-ARG DEV_USER=dev
 
 # Dev container arguments
-ARG USERNAME=${DEV_USER}
+ARG USERNAME=devuser
 ARG UID=1000
 ARG GID=${UID}
 
@@ -87,7 +92,7 @@ RUN groupadd --gid $GID $USERNAME \
  && chown -R ${UID}:${GID} /home/${USERNAME}
 
 # Set the ownership of the overlay workspace to the new user
-RUN chown -R ${UID}:${GID} /${OVERLAY_WS}/
+RUN chown -R ${UID}:${GID} /overlay_ws/
 
 # Move Groot2 to new user's home directory and ensure it can be run
 RUN groupadd fuse \

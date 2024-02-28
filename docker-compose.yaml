@@ -15,12 +15,12 @@ version: "3.9"
 services:
   # Base image containing dependencies.
   base:
-    image: turtlebot3_behavior:base
+    image: ros_ws:base
     build:
       context: .
       dockerfile: docker/Dockerfile
       args:
-        ROS_DISTRO: humble
+        ROS_DISTRO: noetic
       target: base
     # Interactive shell
     stdin_open: true
@@ -45,7 +45,7 @@ services:
   # Overlay image containing the example source code.
   overlay:
     extends: base
-    image: turtlebot3_behavior:overlay
+    image: ros_ws:overlay
     build:
       context: .
       dockerfile: docker/Dockerfile
@@ -54,7 +54,7 @@ services:
   # Developer container
   dev:
     extends: overlay
-    image: turtlebot3_behavior:dev
+    image: ros_ws:dev
     build:
       context: .
       dockerfile: docker/Dockerfile
@@ -62,7 +62,7 @@ services:
       args:
         - UID=${UID:-1000}
         - GID=${UID:-1000}
-        - USERNAME=${USERNAME:-devuser}
+        - USERNAME=${USERNAME:-dev}
     volumes:
       # Mount the source code
       - ./tb3_autonomy:/overlay_ws/src/tb3_autonomy:rw
@@ -71,7 +71,7 @@ services:
       - ./.colcon/build/:/overlay_ws/build/:rw
       - ./.colcon/install/:/overlay_ws/install/:rw
       - ./.colcon/log/:/overlay_ws/log/:rw
-    user: ${USERNAME:-devuser}
+    user: ${USERNAME:-dev}
     command: sleep infinity
 
   # Runs basic TurtleBot3 simulation

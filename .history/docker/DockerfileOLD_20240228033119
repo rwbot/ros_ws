@@ -1,6 +1,6 @@
 # ROS distribution to use
 ARG ROS_DISTRO=noetic
-ARG BASE_WS=ros_ws
+ARG BASE_WS=node_ws
 ########################################
 # Base Image for TurtleBot3 Simulation #
 ########################################
@@ -11,10 +11,10 @@ SHELL ["/bin/bash", "-c"]
 # Install basic apt packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
  git libcanberra-gtk-module libcanberra-gtk3-module fuse3 libfuse2 libqt5svg5-dev \
- python3-pip python3-opencv python3-tk python3-pyqt5.qtwebengine
+ python3-pip python3-tk python3-pyqt5.qtwebengine
 
 # Install additional Python modules
-RUN pip3 install pyudev pyserial pyusb matplotlib transforms3d
+RUN pip3 install pyudev pyserial pyusb
 
 # Create Colcon workspace with external dependencies
 RUN mkdir -p /${BASE_WS}/src
@@ -30,9 +30,9 @@ RUN source /opt/ros/${ROS_DISTRO}/setup.bash \
  && catkin build --symlink-install
 
 # # Download Groot2 AppImage and place it in the home folder.
-WORKDIR /root/
-RUN curl -o Groot2.AppImage https://s3.us-west-1.amazonaws.com/download.behaviortree.dev/groot2_linux_installer/Groot2-v1.0.1-x86_64.AppImage \
- && chmod a+x Groot2.AppImage
+# WORKDIR /root/
+# RUN curl -o Groot2.AppImage https://s3.us-west-1.amazonaws.com/download.behaviortree.dev/groot2_linux_installer/Groot2-v1.0.1-x86_64.AppImage \
+#  && chmod a+x Groot2.AppImage
 
 # Remove display warnings
 RUN mkdir /tmp/runtime-root
@@ -46,15 +46,15 @@ COPY ./docker/entrypoint.sh /
 ENTRYPOINT [ "/entrypoint.sh" ]
 
 ###########################################
-# Overlay Image for External Source Code
+# Overlay Image for TurtleBot3 Simulation #
 ###########################################
 FROM base AS overlay
 ARG OVERLAY_WS=overlay_ws
 # Create an overlay Colcon workspace
 RUN mkdir -p /${OVERLAY_WS}/src
 WORKDIR /${OVERLAY_WS}
-# COPY ./tb3_autonomy/ ./src/tb3_autonomy/
-# COPY ./tb3_worlds/ ./src/tb3_worlds/
+COPY ./tb3_autonomy/ ./src/tb3_autonomy/
+COPY ./tb3_worlds/ ./src/tb3_worlds/
 RUN source /${BASE_WS}/install/setup.bash \
  && rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y \
  && catkin build --symlink-install
