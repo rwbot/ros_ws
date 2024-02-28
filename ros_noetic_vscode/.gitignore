@@ -1,6 +1,3 @@
-.colcon/
-# .vscode/
-**/__pycache__/
 .catkin_tools/
 build/
 devel/
@@ -9,5 +6,3 @@ log/
 logs/
 src/
 !.rosinstall
-**.history
-.DS_Store

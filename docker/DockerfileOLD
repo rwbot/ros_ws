@@ -103,3 +103,13 @@ RUN mv /root/Groot2.AppImage /home/${USERNAME} \
 # Set the user and source entrypoint in the user's .bashrc file
 USER ${USERNAME}
 RUN echo "source /entrypoint.sh" >> /home/${USERNAME}/.bashrc
+
+
+  docking:
+    type: git
+    url: https://github.com/rwbot/docking.git
+    version: master
+  ros_tutorials:
+    type: git
+    url: https://github.com/ros/ros_tutorials.git
+    version: noetic
